@@ -1,52 +1,94 @@
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 
 public class Main {
     public static void main(String[] args) {
-        // Set the limit for the sequence
         int n = 10;
-
-        // Create the ZeroEvenOdd object
-        ZeroEvenOdd zeroEvenOdd = new ZeroEvenOdd(n);
-
-        // Create a thread pool for zero, even, and odd printing
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-
-        // Runnable to print numbers with thread names
         IntConsumer printNumber = number ->
                 System.out.println(Thread.currentThread().getName() + " printed: " + number);
 
-        // Submit the zero, even, and odd printing tasks
-        executor.submit(() -> {
-            Thread.currentThread().setName("Zero-Thread");
-            try {
-                zeroEvenOdd.zero(printNumber);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+        runSemaphoreVersion(n, printNumber);
+        runWaitNotifyVersion(n, printNumber);
+        runLockConditionVersion(n, printNumber);
+    }
 
-        executor.submit(() -> {
-            Thread.currentThread().setName("Even-Thread");
-            try {
-                zeroEvenOdd.even(printNumber);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+    private static void runSemaphoreVersion(int n, IntConsumer printNumber) {
+        System.out.println("=== Semaphore version ===");
+        ZeroEvenOdd zeroEvenOdd = new ZeroEvenOdd(n);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
 
-        executor.submit(() -> {
-            Thread.currentThread().setName("Odd-Thread");
-            try {
-                zeroEvenOdd.odd(printNumber);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+        submitZero(executor, "Semaphore-Zero", () -> zeroEvenOdd.zero(printNumber));
+        submitEven(executor, "Semaphore-Even", () -> zeroEvenOdd.even(printNumber));
+        submitOdd(executor, "Semaphore-Odd", () -> zeroEvenOdd.odd(printNumber));
 
-        // Shutdown the executor service after completion
+        shutdownAndAwait(executor);
+        System.out.println();
+    }
+
+    private static void runWaitNotifyVersion(int n, IntConsumer printNumber) {
+        System.out.println("=== wait/notify version ===");
+        ZeroEvenOddWaitNotify zeroEvenOdd = new ZeroEvenOddWaitNotify(n);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        submitZero(executor, "WaitNotify-Zero", () -> zeroEvenOdd.zero(printNumber));
+        submitEven(executor, "WaitNotify-Even", () -> zeroEvenOdd.even(printNumber));
+        submitOdd(executor, "WaitNotify-Odd", () -> zeroEvenOdd.odd(printNumber));
+
+        shutdownAndAwait(executor);
+        System.out.println();
+    }
+
+    private static void runLockConditionVersion(int n, IntConsumer printNumber) {
+        System.out.println("=== ReentrantLock/Condition version ===");
+        ZeroEvenOddLockCondition zeroEvenOdd = new ZeroEvenOddLockCondition(n);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        submitZero(executor, "LockCondition-Zero", () -> zeroEvenOdd.zero(printNumber));
+        submitEven(executor, "LockCondition-Even", () -> zeroEvenOdd.even(printNumber));
+        submitOdd(executor, "LockCondition-Odd", () -> zeroEvenOdd.odd(printNumber));
+
+        shutdownAndAwait(executor);
+    }
+
+    private static void submitZero(ExecutorService executor, String threadName, ThrowingRunnable task) {
+        executor.submit(() -> runWithThreadName(threadName, task));
+    }
+
+    private static void submitEven(ExecutorService executor, String threadName, ThrowingRunnable task) {
+        executor.submit(() -> runWithThreadName(threadName, task));
+    }
+
+    private static void submitOdd(ExecutorService executor, String threadName, ThrowingRunnable task) {
+        executor.submit(() -> runWithThreadName(threadName, task));
+    }
+
+    private static void runWithThreadName(String threadName, ThrowingRunnable task) {
+        Thread.currentThread().setName(threadName);
+        try {
+            task.run();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void shutdownAndAwait(ExecutorService executor) {
         executor.shutdown();
+        try {
+            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+                executor.shutdownNow();
+                throw new IllegalStateException("Timed out waiting for tasks to finish");
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws InterruptedException;
     }
 }
 
