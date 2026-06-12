@@ -1,27 +1,31 @@
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static void main(String[] args) {
-        // Create the DiningPhilosophers instance
-        DiningPhilosophers diningPhilosophers = new DiningPhilosophers();
+        runCase("Semaphore + Butler", new DiningPhilosophers());
+        runCase("Ordered Fork Locks", new DiningPhilosophersOrderedLocks());
+        runCase("Monitor (state + wait/notifyAll)", new DiningPhilosophersMonitor());
+    }
 
-        // Create a thread pool to run the philosopher threads
+    private static void runCase(String title, DiningPhilosophersSolver solver) {
+        System.out.println("\n=== " + title + " ===");
         ExecutorService executorService = Executors.newFixedThreadPool(5);
 
-        // Create and start 5 philosopher threads
         for (int philosopher = 0; philosopher < 5; philosopher++) {
             final int id = philosopher;
             executorService.submit(() -> {
+                Thread.currentThread().setName(title.replace(' ', '-') + "-P" + id);
                 try {
-                    diningPhilosophers.wantsToEat(
+                    solver.wantsToEat(
                             id,
                             () -> System.out.println("Philosopher " + id + " picked up left fork (" + Thread.currentThread().getName() + ")"),
                             () -> System.out.println("Philosopher " + id + " picked up right fork (" + Thread.currentThread().getName() + ")"),
                             () -> {
                                 System.out.println("Philosopher " + id + " is eating (" + Thread.currentThread().getName() + ")");
                                 try {
-                                    Thread.sleep(1000); // Simulate eating time
+                                    Thread.sleep(300);
                                 } catch (InterruptedException e) {
                                     Thread.currentThread().interrupt();
                                 }
@@ -35,39 +39,15 @@ public class Main {
             });
         }
 
-        // Shutdown the executor service after all philosophers are done
         executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+                executorService.shutdownNow();
+                throw new IllegalStateException("Timed out waiting for philosophers to finish");
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }
-
-/*
-
-Output :
-
-Philosopher 0 picked up left fork (pool-1-thread-1)
-Philosopher 0 picked up right fork (pool-1-thread-1)
-Philosopher 0 is eating (pool-1-thread-1)
-Philosopher 0 put down left fork (pool-1-thread-1)
-Philosopher 4 picked up left fork (pool-1-thread-5)
-Philosopher 4 picked up right fork (pool-1-thread-5)
-Philosopher 4 is eating (pool-1-thread-5)
-Philosopher 0 put down right fork (pool-1-thread-1)
-Philosopher 1 picked up left fork (pool-1-thread-2)
-Philosopher 1 picked up right fork (pool-1-thread-2)
-Philosopher 1 is eating (pool-1-thread-2)
-Philosopher 1 put down left fork (pool-1-thread-2)
-Philosopher 1 put down right fork (pool-1-thread-2)
-Philosopher 4 put down left fork (pool-1-thread-5)
-Philosopher 4 put down right fork (pool-1-thread-5)
-Philosopher 3 picked up left fork (pool-1-thread-4)
-Philosopher 3 picked up right fork (pool-1-thread-4)
-Philosopher 3 is eating (pool-1-thread-4)
-Philosopher 3 put down left fork (pool-1-thread-4)
-Philosopher 2 picked up left fork (pool-1-thread-3)
-Philosopher 2 picked up right fork (pool-1-thread-3)
-Philosopher 2 is eating (pool-1-thread-3)
-Philosopher 3 put down right fork (pool-1-thread-4)
-Philosopher 2 put down left fork (pool-1-thread-3)
-Philosopher 2 put down right fork (pool-1-thread-3)
-
-*/

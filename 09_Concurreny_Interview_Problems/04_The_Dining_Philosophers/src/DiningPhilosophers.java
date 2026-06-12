@@ -1,12 +1,12 @@
 import java.util.concurrent.Semaphore;
 
-class DiningPhilosophers {
+class DiningPhilosophers implements DiningPhilosophersSolver {
     // Semaphore to limit the number of philosophers trying to eat simultaneously
-    private Semaphore semaphore;
+    private final Semaphore semaphore;
 
 
     // Array of semaphores to control access to each fork
-    private Semaphore[] forkSemaphore;
+    private final Semaphore[] forkSemaphore;
 
 
     public DiningPhilosophers() {
@@ -21,6 +21,7 @@ class DiningPhilosophers {
 
 
     // call the run() method of any runnable to execute its code
+    @Override
     public void wantsToEat(int philosopher, Runnable pickLeftFork, Runnable pickRightFork,
                            Runnable eat, Runnable putLeftFork, Runnable putRightFork) throws InterruptedException {
         // Limit the number of philosophers who can try to eat simultaneously
